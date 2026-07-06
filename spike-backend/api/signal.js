@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { symbol, direction, confidence, components, bar_time, sent_at } = req.body;
+    const { symbol, direction, confidence, components, atr_value, bar_time, sent_at } = req.body;
 
     if (!symbol || !direction || confidence === undefined) {
       return res.status(400).json({ error: 'Missing required fields (symbol, direction, confidence)' });
@@ -31,6 +31,7 @@ export default async function handler(req, res) {
           compression: components?.compression ?? null,
           velocity: components?.velocity ?? null,
           time_since_spike: components?.time_since_spike ?? null,
+          atr_value: atr_value ?? null,
           bar_time,
           sent_at
         },
