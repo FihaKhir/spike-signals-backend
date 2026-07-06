@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spike Signal Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0e14;
+    --panel: #131720;
+    --panel-hover: #171c27;
+    --border: #232a37;
+    --text: #e4e7eb;
+    --muted: #6b7280;
+    --up: #35c77e;
+    --down: #e5484d;
+    --gold: #d4a72c;
+    --gold-dim: rgba(212,167,44,0.15);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  header{
+    max-width:1100px;
+    margin:0 auto 28px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:18px;
+  }
+  header h1{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:20px;
+    font-weight:600;
+    letter-spacing:0.02em;
+  }
+  header h1 span{color:var(--gold);}
+  .clock{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .grid{
+    max-width:1100px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+    gap:14px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px;
+    cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease;
+    position:relative;
+  }
+  .card:hover{ border-color:#3a4356; transform:translateY(-1px); }
+  .card .symbol{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:2px;
+  }
+  .card .dir{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-weight:600;
+    margin-bottom:14px;
+  }
+  .dir.up{color:var(--up);}
+  .dir.down{color:var(--down);}
+  .gauge-wrap{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:6px 0 10px;
+  }
+  .gauge-num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:22px;
+    font-weight:700;
+  }
+  .gauge-label{
+    font-size:9px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+  }
+  .card .updated{
+    font-size:10px;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+    text-align:right;
+  }
+  .empty{
+    max-width:1100px;
+    margin:60px auto;
+    text-align:center;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    line-height:1.7;
+  }
+  /* Detail overlay */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(4,6,10,0.7);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:50;
+  }
+  .overlay.show{ display:flex; }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    max-width:420px;
+    width:100%;
+    padding:26px;
+  }
+  .panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:18px;
+  }
+  .panel-head .symbol{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:20px;
+    font-weight:700;
+  }
+  .panel-head .dir{
+    display:inline-block;
+    margin-top:6px;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:5px;
+  }
+  .dir.up{ background:rgba(53,199,126,0.12); }
+  .dir.down{ background:rgba(229,72,77,0.12); }
+  .close-btn{
+    background:none; border:none; color:var(--muted);
+    font-size:20px; cursor:pointer; line-height:1;
+  }
+  .confidence-big{
+    text-align:center;
+    margin:8px 0 22px;
+  }
+  .confidence-big .num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:44px;
+    font-weight:700;
+    color:var(--gold);
+  }
+  .confidence-big .lbl{
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    margin-top:2px;
+  }
+  .components{ margin-bottom:20px; }
+  .comp-row{ margin-bottom:12px; }
+  .comp-row .top{
+    display:flex; justify-content:space-between;
+    font-size:12px; margin-bottom:5px;
+  }
+  .comp-row .top .name{ color:var(--muted); }
+  .comp-row .top .val{ font-family:'IBM Plex Mono',monospace; }
+  .bar-track{
+    height:5px; background:#1c2230; border-radius:3px; overflow:hidden;
+  }
+  .bar-fill{ height:100%; background:var(--gold); border-radius:3px; }
+  .stop-box{
+    background:#0e1119;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px 16px;
+    margin-bottom:14px;
+  }
+  .stop-box .label{
+    font-size:11px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.06em;
+    margin-bottom:6px;
+  }
+  .stop-box .value{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:17px; font-weight:600;
+  }
+  .disclaimer{
+    font-size:11px;
+    line-height:1.6;
+    color:var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Spike<span>Signal</span>Hub</h1>
+  <div class="clock" id="clock">—</div>
+</header>
+
+<div id="grid" class="grid"></div>
+<div id="empty" class="empty" style="display:none;">
+  No signals yet.<br>Waiting for your EA to report data.
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+const API_URL = '/api/latest';
+const POLL_MS = 4000;
+const STOP_ATR_MULTIPLE = 1.5; // how many ATRs out we suggest as a typical stop distance
+
+function timeAgo(unixSeconds){
+  const diff = Math.floor(Date.now()/1000 - unixSeconds);
+  if(diff < 60) return diff + 's ago';
+  if(diff < 3600) return Math.floor(diff/60) + 'm ago';
+  return Math.floor(diff/3600) + 'h ago';
+}
+
+function gaugeSVG(confidence, color){
+  const r = 30, c = 2*Math.PI*r;
+  const offset = c - (confidence/100)*c;
+  return `
+    <svg width="76" height="76" viewBox="0 0 76 76">
+      <circle cx="38" cy="38" r="${r}" stroke="#1c2230" stroke-width="6" fill="none"/>
+      <circle cx="38" cy="38" r="${r}" stroke="${color}" stroke-width="6" fill="none"
+        stroke-dasharray="${c}" stroke-dashoffset="${offset}"
+        stroke-linecap="round" transform="rotate(-90 38 38)"/>
+    </svg>`;
+}
+
+function renderGrid(data){
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+
+  if(!data || data.length === 0){
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const sorted = [...data].sort((a,b) => b.confidence - a.confidence);
+
+  grid.innerHTML = sorted.map((s, i) => {
+    const color = s.direction === 'up' ? 'var(--up)' : 'var(--down)';
+    const colorHex = s.direction === 'up' ? '#35c77e' : '#e5484d';
+    return `
+    <div class="card" onclick="openDetail(${i})">
+      <div class="symbol">${s.symbol}</div>
+      <div class="dir ${s.direction}">${s.direction === 'up' ? '▲ up' : '▼ down'}</div>
+      <div class="gauge-wrap" style="position:relative;">
+        ${gaugeSVG(s.confidence, colorHex)}
+        <div style="position:absolute; text-align:center;">
+          <div class="gauge-num">${Math.round(s.confidence)}</div>
+        </div>
+      </div>
+      <div class="gauge-label" style="text-align:center; margin-bottom:8px;">confidence</div>
+      <div class="updated">${timeAgo(s.sent_at)}</div>
+    </div>`;
+  }).join('');
+
+  window.__signals = sorted;
+}
+
+function openDetail(i){
+  const s = window.__signals[i];
+  const panel = document.getElementById('panel');
+  const isUp = s.direction === 'up';
+  const stopDistance = s.atr_value ? (s.atr_value * STOP_ATR_MULTIPLE) : null;
+
+  panel.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <div class="symbol">${s.symbol}</div>
+        <div class="dir ${s.direction}" style="color:${isUp ? 'var(--up)' : 'var(--down)'}">
+          ${isUp ? '▲ up' : '▼ down'}
+        </div>
+      </div>
+      <button class="close-btn" onclick="closeDetail()">✕</button>
+    </div>
+
+    <div class="confidence-big">
+      <div class="num">${s.confidence.toFixed(1)}%</div>
+      <div class="lbl">composite confidence</div>
+    </div>
+
+    <div class="components">
+      ${compRow('Compression', s.compression)}
+      ${compRow('Velocity', s.velocity)}
+      ${compRow('Time since last spike', s.time_since_spike)}
+    </div>
+
+    ${stopDistance ? `
+    <div class="stop-box">
+      <div class="label">Typical stop distance (1.5× recent ATR)</div>
+      <div class="value">${stopDistance.toFixed(5)} points</div>
+    </div>` : ''}
+
+    <div class="disclaimer">
+      This is a statistical estimate based on recent volatility (ATR) — not a guaranteed
+      outcome or fixed target. Synthetic index spikes have a random component; use this
+      alongside your own risk management.
+    </div>
+  `;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function compRow(name, val){
+  return `
+    <div class="comp-row">
+      <div class="top"><span class="name">${name}</span><span class="val">${val?.toFixed(1) ?? '—'}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${val ?? 0}%"></div></div>
+    </div>`;
+}
+
+function closeDetail(){
+  document.getElementById('overlay').classList.remove('show');
+}
+
+async function poll(){
+  try{
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    renderGrid(data);
+  }catch(e){
+    console.error('Failed to fetch signals', e);
+  }
+}
+
+function updateClock(){
+  document.getElementById('clock').textContent = new Date().toUTCString().slice(17,25) + ' UTC';
+}
+
+poll();
+setInterval(poll, POLL_MS);
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+
+</body>
+</html>
