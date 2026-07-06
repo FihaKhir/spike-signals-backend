@@ -234,7 +234,8 @@ const POLL_MS = 4000;
 const STOP_ATR_MULTIPLE = 1.5; // how many ATRs out we suggest as a typical stop distance
 
 function timeAgo(unixSeconds){
-  const diff = Math.floor(Date.now()/1000 - unixSeconds);
+  let diff = Math.floor(Date.now()/1000 - unixSeconds);
+  if(diff < 0) diff = 0; // broker server clock can run ahead of real UTC; clamp instead of showing negative
   if(diff < 60) return diff + 's ago';
   if(diff < 3600) return Math.floor(diff/60) + 'm ago';
   return Math.floor(diff/3600) + 'h ago';
