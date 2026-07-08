@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   try {
     const {
-      symbol, direction, confidence, components,
+      symbol, direction, confidence, components, confirmations,
       atr_value, entry_price, sl_price, tp_price,
       timeframe, status, hit_time, bar_time, sent_at
     } = req.body;
@@ -31,6 +31,7 @@ export default async function handler(req, res) {
     const row = { symbol };
     if (direction !== undefined) row.direction = direction;
     if (confidence !== undefined) row.confidence = confidence;
+    if (confirmations !== undefined) row.confirmations = confirmations;
     if (components?.compression !== undefined) row.compression = components.compression;
     if (components?.velocity !== undefined) row.velocity = components.velocity;
     if (components?.time_since_spike !== undefined) row.time_since_spike = components.time_since_spike;
