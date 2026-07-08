@@ -120,6 +120,20 @@
   }
   .closed-badge.tp{ background:rgba(53,199,126,0.15); color:var(--up); }
   .closed-badge.sl{ background:rgba(229,72,77,0.15); color:var(--down); }
+  .confirm-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    font-weight:600;
+    padding:3px 7px;
+    border-radius:5px;
+    margin-bottom:8px;
+  }
+  .confirm-badge.tier-3{ background:rgba(212,167,44,0.15); color:var(--gold); }
+  .confirm-badge.tier-2{ background:rgba(94,140,214,0.15); color:#5e8cd6; }
+  .confirm-badge.tier-1{ background:rgba(107,114,128,0.15); color:var(--muted); }
   .gauge-wrap{
     display:flex;
     align-items:center;
@@ -330,6 +344,12 @@ function gaugeSVG(confidence, color){
     </svg>`;
 }
 
+function confirmBadge(confirmations){
+  if(confirmations === undefined || confirmations === null) return '';
+  const tier = confirmations >= 3 ? 'tier-3' : confirmations >= 2 ? 'tier-2' : 'tier-1';
+  return `<span class="confirm-badge ${tier}">${confirmations}/3 confirmed</span>`;
+}
+
 function isVisible(s){
   const status = s.status || 'active';
   if(status === 'active') return true;
@@ -367,7 +387,7 @@ function renderGrid(data){
     <div class="card ${isClosed ? 'closed' : ''}" onclick="openDetail(${i})">
       <div class="symbol">${s.symbol}</div>
       <div class="dir ${s.direction}">${s.direction === 'up' ? '▲ up' : '▼ down'}</div>
-      ${isClosed ? `<div class="closed-badge ${status === 'tp_hit' ? 'tp' : 'sl'}">${status === 'tp_hit' ? 'TP HIT' : 'SL HIT'}</div>` : ''}
+      ${isClosed ? `<div class="closed-badge ${status === 'tp_hit' ? 'tp' : 'sl'}">${status === 'tp_hit' ? 'TP HIT' : 'SL HIT'}</div>` : confirmBadge(s.confirmations)}
       <div class="gauge-wrap">
         ${gaugeSVG(s.confidence, isClosed ? '#3a4356' : colorHex)}
         <div class="gauge-num">${Math.round(s.confidence)}</div>
@@ -408,6 +428,7 @@ function openDetail(i){
     <div class="confidence-big">
       <div class="num">${s.confidence.toFixed(1)}%</div>
       <div class="lbl">composite confidence ${status !== 'active' ? '· ' + (status === 'tp_hit' ? 'TP hit' : 'SL hit') : ''}</div>
+      <div style="margin-top:10px;">${confirmBadge(s.confirmations)}</div>
     </div>
 
     <div class="levels">
