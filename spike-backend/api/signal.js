@@ -1,6 +1,7 @@
 // api/signal.js
-// This endpoint receives signals POSTed from your MT5 EA (SpikeSignalHub.mq5)
-// and saves/updates them in Supabase — one row per symbol, always the latest.
+// Receives both new signals AND status updates (TP/SL hit) from the MT5 EA.
+// Upsert only touches the fields provided, so a status-only update won't
+// wipe out the entry/SL/TP data already stored for that symbol.
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -15,28 +16,37 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { symbol, direction, confidence, components, atr_value, bar_time, sent_at } = req.body;
+    const {
+      symbol, direction, confidence, components,
+      atr_value, entry_price, sl_price, tp_price,
+      timeframe, status, hit_time, bar_time, sent_at
+    } = req.body;
 
-    if (!symbol || !direction || confidence === undefined) {
-      return res.status(400).json({ error: 'Missing required fields (symbol, direction, confidence)' });
+    if (!symbol) {
+      return res.status(400).json({ error: 'Missing required field: symbol' });
     }
+
+    // Build the row with only the fields that were actually sent, so a
+    // status-only update (TP/SL hit) doesn't overwrite other columns with null.
+    const row = { symbol };
+    if (direction !== undefined) row.direction = direction;
+    if (confidence !== undefined) row.confidence = confidence;
+    if (components?.compression !== undefined) row.compression = components.compression;
+    if (components?.velocity !== undefined) row.velocity = components.velocity;
+    if (components?.time_since_spike !== undefined) row.time_since_spike = components.time_since_spike;
+    if (atr_value !== undefined) row.atr_value = atr_value;
+    if (entry_price !== undefined) row.entry_price = entry_price;
+    if (sl_price !== undefined) row.sl_price = sl_price;
+    if (tp_price !== undefined) row.tp_price = tp_price;
+    if (timeframe !== undefined) row.timeframe = timeframe;
+    if (status !== undefined) row.status = status;
+    if (hit_time !== undefined) row.hit_time = hit_time;
+    if (bar_time !== undefined) row.bar_time = bar_time;
+    if (sent_at !== undefined) row.sent_at = sent_at;
 
     const { error } = await supabase
       .from('signals')
-      .upsert(
-        {
-          symbol,
-          direction,
-          confidence,
-          compression: components?.compression ?? null,
-          velocity: components?.velocity ?? null,
-          time_since_spike: components?.time_since_spike ?? null,
-          atr_value: atr_value ?? null,
-          bar_time,
-          sent_at
-        },
-        { onConflict: 'symbol' } // one row per symbol, always overwritten with the latest
-      );
+      .upsert(row, { onConflict: 'symbol' });
 
     if (error) {
       console.error('Supabase error:', error);
