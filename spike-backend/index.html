@@ -291,7 +291,16 @@
     <h1>FIHA KHIR</h1>
     <div class="sub">Spike Signal Hub</div>
   </div>
-  <div class="clock" id="clock">—</div>
+  <div style="display:flex; align-items:center; gap:14px;">
+    <button id="soundToggle" onclick="toggleSound()" style="
+      background:var(--panel); border:1px solid var(--border); color:var(--muted);
+      font-family:'IBM Plex Mono',monospace; font-size:12px; padding:6px 12px;
+      border-radius:6px; cursor:pointer;">🔕 Enable Sound</button>
+    <div style="display:flex; align-items:center; gap:14px;">
+    <button id="soundBtn" onclick="toggleSound()" style="background:var(--panel); border:1px solid var(--border); color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:12px; padding:6px 12px; border-radius:6px; cursor:pointer;">🔕 Enable Sound</button>
+    <div class="clock" id="clock">—</div>
+  </div>
+  </div>
 </header>
 
 <div class="tracked-bar">
@@ -313,6 +322,47 @@ const API_URL = '/api/latest';
 const POLL_MS = 4000;
 const CLOSED_VISIBLE_MS = 60 * 1000; // keep a closed (TP/SL hit) card visible for 1 minute, then hide it
 
+let soundEnabled = false;
+let audioCtx = null;
+let knownActiveSymbols = new Set();
+
+function toggleSound(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  soundEnabled = !soundEnabled;
+  const btn = document.getElementById('soundBtn');
+  btn.textContent = soundEnabled ? '🔔 Sound: ON' : '🔕 Enable Sound';
+  btn.style.color = soundEnabled ? 'var(--gold)' : 'var(--muted)';
+  btn.style.borderColor = soundEnabled ? 'var(--gold)' : 'var(--border)';
+  if(soundEnabled) playBeep(); // quick confirmation beep so you know it worked
+}
+
+function playBeep(){
+  if(!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'sine';
+  osc.frequency.value = 880;
+  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.2, audioCtx.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.35);
+}
+
+function checkForNewSignals(data){
+  const activeNow = new Set((data || []).filter(s => (s.status || 'active') === 'active').map(s => s.symbol));
+  if(soundEnabled){
+    for(const sym of activeNow){
+      if(!knownActiveSymbols.has(sym)) { playBeep(); break; } // one beep even if several arrive in the same poll
+    }
+  }
+  knownActiveSymbols = activeNow;
+}
+
 const TRACKED_SYMBOLS = [
   'GainX 400','GainX 600','GainX 800','GainX 999','GainX 1200','GainX 1800',
   'PainX 400','PainX 600','PainX 800','PainX 999','PainX 1200','PainX 1800',
@@ -323,6 +373,55 @@ const TRACKED_SYMBOLS = [
 
 document.getElementById('chips').innerHTML =
   TRACKED_SYMBOLS.map(s => `<span class="chip">${s}</span>`).join('');
+
+// --- Sound notifications -------------------------------------------
+let soundEnabled = false;
+let audioCtx = null;
+let seenKeys = new Set(); // tracks which signals we've already alerted on (symbol + sent_at)
+let firstPoll = true;     // don't ding for everything already on screen when the page first loads
+
+function toggleSound(){
+  soundEnabled = !soundEnabled;
+  const btn = document.getElementById('soundToggle');
+  if(soundEnabled){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    btn.textContent = '🔔 Sound On';
+    btn.style.color = 'var(--gold)';
+    btn.style.borderColor = 'var(--gold)';
+  } else {
+    btn.textContent = '🔕 Enable Sound';
+    btn.style.color = 'var(--muted)';
+    btn.style.borderColor = 'var(--border)';
+  }
+}
+
+function playDing(){
+  if(!soundEnabled || !audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.35);
+}
+
+function checkForNewSignals(data){
+  const activeNow = (data || []).filter(s => (s.status || 'active') === 'active');
+  const currentKeys = new Set(activeNow.map(s => s.symbol + ':' + s.sent_at));
+
+  if(!firstPoll){
+    for(const s of activeNow){
+      const key = s.symbol + ':' + s.sent_at;
+      if(!seenKeys.has(key)) playDing();
+    }
+  }
+  firstPoll = false;
+  seenKeys = currentKeys;
+}
 
 function timeAgo(unixSeconds){
   let diff = Math.floor(Date.now()/1000 - unixSeconds);
@@ -394,7 +493,7 @@ function renderGrid(data){
       </div>
       <div class="gauge-label" style="text-align:center; margin-bottom:8px;">confidence</div>
       <div class="foot-row">
-        <span class="tf">${s.timeframe || ''}</span>
+        <span class="tf">${s.timeframe || ''}${s.family ? ' · ' + s.family : ''}</span>
         <span class="updated">${timeAgo(s.sent_at)}</span>
       </div>
     </div>`;
@@ -447,14 +546,18 @@ function openDetail(i){
     </div>
 
     <div class="meta-row">
+      <span>${s.family ? s.family + ' family' : ''}${s.ticks_since_jump !== undefined && s.expected_gap_ticks ? ' · ' + s.ticks_since_jump + '/' + s.expected_gap_ticks + ' ticks' : ''}</span>
       <span>Timeframe: ${s.timeframe || '—'}</span>
+    </div>
+    <div class="meta-row">
+      <span></span>
       <span>${timeAgo(s.sent_at)}</span>
     </div>
 
     <div class="components">
       ${compRow('Compression', s.compression)}
       ${compRow('Velocity', s.velocity)}
-      ${compRow('Time since last spike', s.time_since_spike)}
+      ${compRow('Family signal (' + (s.family || '—') + ')', s.family_score ?? s.time_since_spike)}
     </div>
 
     <div class="disclaimer">
@@ -482,6 +585,7 @@ async function poll(){
   try{
     const res = await fetch(API_URL);
     const data = await res.json();
+    checkForNewSignals(data);
     renderGrid(data);
   }catch(e){
     console.error('Failed to fetch signals', e);
