@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIHA KHIR — Spike Signal Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0e14;
+    --panel: #131720;
+    --border: #232a37;
+    --text: #e4e7eb;
+    --muted: #6b7280;
+    --up: #35c77e;
+    --down: #e5484d;
+    --gold: #d4a72c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  header{
+    max-width:1100px;
+    margin:0 auto 6px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header h1{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:24px;
+    font-weight:700;
+    letter-spacing:0.03em;
+  }
+  header .sub{
+    font-size:12px;
+    color:var(--gold);
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    margin-top:2px;
+  }
+  .clock{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .sound-btn{
+    background:var(--panel); border:1px solid var(--border); color:var(--muted);
+    font-family:'IBM Plex Mono',monospace; font-size:12px; padding:6px 12px;
+    border-radius:6px; cursor:pointer;
+  }
+  .tracked-bar{
+    max-width:1100px;
+    margin:18px auto 26px;
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    padding:14px 0;
+  }
+  .tracked-bar .label{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--muted);
+    margin-bottom:9px;
+  }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:5px;
+    padding:4px 8px;
+  }
+  .grid{
+    max-width:1100px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+    gap:14px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px;
+    cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease;
+    position:relative;
+  }
+  .card:hover{ border-color:#3a4356; transform:translateY(-1px); }
+  .card.closed{ opacity:0.55; }
+  .card .symbol{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:2px;
+  }
+  .card .dir{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  .dir.up{color:var(--up);}
+  .dir.down{color:var(--down);}
+  .closed-badge{
+    display:inline-block;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.05em;
+    padding:2px 6px;
+    border-radius:4px;
+    margin-bottom:8px;
+  }
+  .closed-badge.tp{ background:rgba(53,199,126,0.15); color:var(--up); }
+  .closed-badge.sl{ background:rgba(229,72,77,0.15); color:var(--down); }
+  .confirm-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    font-weight:600;
+    padding:3px 7px;
+    border-radius:5px;
+    margin-bottom:8px;
+  }
+  .confirm-badge.tier-3{ background:rgba(212,167,44,0.15); color:var(--gold); }
+  .confirm-badge.tier-2{ background:rgba(94,140,214,0.15); color:#5e8cd6; }
+  .confirm-badge.tier-1{ background:rgba(107,114,128,0.15); color:var(--muted); }
+  .gauge-wrap{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:6px 0 10px;
+    position:relative;
+  }
+  .gauge-num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:22px;
+    font-weight:700;
+    position:absolute;
+    text-align:center;
+  }
+  .gauge-label{
+    font-size:9px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+  }
+  .card .tf{
+    font-size:10px;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .card .updated{
+    font-size:10px;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+    text-align:right;
+  }
+  .card .foot-row{
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .empty{
+    max-width:1100px;
+    margin:50px auto;
+    text-align:center;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    line-height:1.7;
+  }
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(4,6,10,0.7);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:50;
+  }
+  .overlay.show{ display:flex; }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    max-width:420px;
+    width:100%;
+    max-height:90vh;
+    overflow-y:auto;
+    padding:26px;
+  }
+  .panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:18px;
+  }
+  .panel-head .symbol{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:20px;
+    font-weight:700;
+  }
+  .panel-head .dir{
+    display:inline-block;
+    margin-top:6px;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:5px;
+  }
+  .dir.up{ background:rgba(53,199,126,0.12); }
+  .dir.down{ background:rgba(229,72,77,0.12); }
+  .close-btn{
+    background:none; border:none; color:var(--muted);
+    font-size:20px; cursor:pointer; line-height:1;
+  }
+  .confidence-big{ text-align:center; margin:8px 0 20px; }
+  .confidence-big .num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:44px; font-weight:700; color:var(--gold);
+  }
+  .confidence-big .lbl{
+    font-size:11px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.08em; margin-top:2px;
+  }
+  .levels{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:8px;
+    margin-bottom:18px;
+  }
+  .level-box{
+    background:#0e1119;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 8px;
+    text-align:center;
+  }
+  .level-box .l-label{
+    font-size:9px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;
+  }
+  .level-box .l-value{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px; font-weight:600;
+  }
+  .level-box.entry .l-value{ color:var(--text); }
+  .level-box.sl .l-value{ color:var(--down); }
+  .level-box.tp .l-value{ color:var(--up); }
+  .meta-row{
+    display:flex; justify-content:space-between;
+    font-size:11px; color:var(--muted);
+    margin-bottom:16px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .components{ margin-bottom:18px; }
+  .comp-row{ margin-bottom:12px; }
+  .comp-row .top{
+    display:flex; justify-content:space-between;
+    font-size:12px; margin-bottom:5px;
+  }
+  .comp-row .top .name{ color:var(--muted); }
+  .comp-row .top .val{ font-family:'IBM Plex Mono',monospace; }
+  .bar-track{ height:5px; background:#1c2230; border-radius:3px; overflow:hidden; }
+  .bar-fill{ height:100%; background:var(--gold); border-radius:3px; }
+  .disclaimer{ font-size:11px; line-height:1.6; color:var(--muted); }
+
+  @media (max-width:480px){
+    body{ padding:16px 12px 50px; }
+    header h1{ font-size:20px; }
+    .grid{ grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+    .card{ padding:12px; }
+    .levels{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>FIHA KHIR</h1>
+    <div class="sub">Spike Signal Hub</div>
+  </div>
+  <div style="display:flex; align-items:center; gap:14px;">
+    <button id="soundToggle" class="sound-btn" onclick="toggleSound()">🔕 Enable Sound</button>
+    <div class="clock" id="clock">—</div>
+  </div>
+</header>
+
+<div class="tracked-bar">
+  <div class="label">Tracked symbols</div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div id="grid" class="grid"></div>
+<div id="empty" class="empty" style="display:none;">
+  No active signals right now.<br>The robot is watching — a box appears here the moment one fires.
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+const API_URL = '/api/latest';
+const POLL_MS = 4000;
+const CLOSED_VISIBLE_MS = 60 * 1000; // keep a closed (TP/SL hit) card visible for 1 minute, then hide it
+
+const TRACKED_SYMBOLS = [
+  'GainX 400','GainX 600','GainX 800','GainX 999','GainX 1200','GainX 1800',
+  'PainX 400','PainX 600','PainX 800','PainX 999','PainX 1200','PainX 1800',
+  'BreakX 600','BreakX 1200','BreakX 1800',
+  'SwitchX 600','SwitchX 1200','SwitchX 1800',
+  'TrendX 600','TrendX 1200','TrendX 1800'
+];
+
+document.getElementById('chips').innerHTML =
+  TRACKED_SYMBOLS.map(s => `<span class="chip">${s}</span>`).join('');
+
+// --- Sound notifications -------------------------------------------
+let soundEnabled = false;
+let audioCtx = null;
+let seenKeys = new Set();
+let firstPoll = true; // don't ding for everything already on screen when the page first loads
+
+function toggleSound(){
+  soundEnabled = !soundEnabled;
+  const btn = document.getElementById('soundToggle');
+  if(soundEnabled){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    btn.textContent = '🔔 Sound On';
+    btn.style.color = 'var(--gold)';
+    btn.style.borderColor = 'var(--gold)';
+    playDing();
+  } else {
+    btn.textContent = '🔕 Enable Sound';
+    btn.style.color = 'var(--muted)';
+    btn.style.borderColor = 'var(--border)';
+  }
+}
+
+function playDing(){
+  if(!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.35);
+}
+
+function checkForNewSignals(data){
+  const activeNow = (data || []).filter(s => (s.status || 'active') === 'active');
+  const currentKeys = new Set(activeNow.map(s => s.symbol + ':' + s.sent_at));
+
+  if(!firstPoll && soundEnabled){
+    for(const s of activeNow){
+      const key = s.symbol + ':' + s.sent_at;
+      if(!seenKeys.has(key)) { playDing(); break; }
+    }
+  }
+  firstPoll = false;
+  seenKeys = currentKeys;
+}
+
+function timeAgo(unixSeconds){
+  let diff = Math.floor(Date.now()/1000 - unixSeconds);
+  if(diff < 0) diff = 0;
+  if(diff < 60) return diff + 's ago';
+  if(diff < 3600) return Math.floor(diff/60) + 'm ago';
+  return Math.floor(diff/3600) + 'h ago';
+}
+
+function gaugeSVG(confidence, color){
+  const r = 30, c = 2*Math.PI*r;
+  const offset = c - (confidence/100)*c;
+  return `
+    <svg width="76" height="76" viewBox="0 0 76 76">
+      <circle cx="38" cy="38" r="${r}" stroke="#1c2230" stroke-width="6" fill="none"/>
+      <circle cx="38" cy="38" r="${r}" stroke="${color}" stroke-width="6" fill="none"
+        stroke-dasharray="${c}" stroke-dashoffset="${offset}"
+        stroke-linecap="round" transform="rotate(-90 38 38)"/>
+    </svg>`;
+}
+
+function confirmBadge(confirmations){
+  if(confirmations === undefined || confirmations === null) return '';
+  const tier = confirmations >= 3 ? 'tier-3' : confirmations >= 2 ? 'tier-2' : 'tier-1';
+  return `<span class="confirm-badge ${tier}">${confirmations}/3 confirmed</span>`;
+}
+
+function isVisible(s){
+  const status = s.status || 'active';
+  if(status === 'active') return true;
+  if(!s.hit_time) return false;
+  const ageMs = Date.now() - (s.hit_time * 1000);
+  return ageMs < CLOSED_VISIBLE_MS;
+}
+
+function renderGrid(data){
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+
+  const visible = (data || []).filter(isVisible);
+
+  if(visible.length === 0){
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const sorted = [...visible].sort((a,b) => {
+    const aActive = (a.status || 'active') === 'active';
+    const bActive = (b.status || 'active') === 'active';
+    if(aActive !== bActive) return aActive ? -1 : 1;
+    return b.confidence - a.confidence;
+  });
+
+  grid.innerHTML = sorted.map((s, i) => {
+    const status = s.status || 'active';
+    const isClosed = status !== 'active';
+    const colorHex = s.direction === 'up' ? '#35c77e' : '#e5484d';
+
+    return `
+    <div class="card ${isClosed ? 'closed' : ''}" onclick="openDetail(${i})">
+      <div class="symbol">${s.symbol}</div>
+      <div class="dir ${s.direction}">${s.direction === 'up' ? '▲ up' : '▼ down'}</div>
+      ${isClosed ? `<div class="closed-badge ${status === 'tp_hit' ? 'tp' : 'sl'}">${status === 'tp_hit' ? 'TP HIT' : 'SL HIT'}</div>` : confirmBadge(s.confirmations)}
+      <div class="gauge-wrap">
+        ${gaugeSVG(s.confidence, isClosed ? '#3a4356' : colorHex)}
+        <div class="gauge-num">${Math.round(s.confidence)}</div>
+      </div>
+      <div class="gauge-label" style="text-align:center; margin-bottom:8px;">confidence</div>
+      <div class="foot-row">
+        <span class="tf">${s.timeframe || ''}${s.family ? ' · ' + s.family : ''}</span>
+        <span class="updated">${timeAgo(s.sent_at)}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  window.__signals = sorted;
+}
+
+function fmtPrice(v){
+  if(v === null || v === undefined) return '—';
+  return Number(v).toFixed(v >= 100 ? 2 : 5);
+}
+
+function openDetail(i){
+  const s = window.__signals[i];
+  const panel = document.getElementById('panel');
+  const isUp = s.direction === 'up';
+  const status = s.status || 'active';
+
+  panel.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <div class="symbol">${s.symbol}</div>
+        <div class="dir ${s.direction}" style="color:${isUp ? 'var(--up)' : 'var(--down)'}">
+          ${isUp ? '▲ up' : '▼ down'}
+        </div>
+      </div>
+      <button class="close-btn" onclick="closeDetail()">✕</button>
+    </div>
+
+    <div class="confidence-big">
+      <div class="num">${s.confidence.toFixed(1)}%</div>
+      <div class="lbl">composite confidence ${status !== 'active' ? '· ' + (status === 'tp_hit' ? 'TP hit' : 'SL hit') : ''}</div>
+      <div style="margin-top:10px;">${confirmBadge(s.confirmations)}</div>
+    </div>
+
+    <div class="levels">
+      <div class="level-box entry">
+        <div class="l-label">Entry</div>
+        <div class="l-value">${fmtPrice(s.entry_price)}</div>
+      </div>
+      <div class="level-box sl">
+        <div class="l-label">Stop Loss</div>
+        <div class="l-value">${fmtPrice(s.sl_price)}</div>
+      </div>
+      <div class="level-box tp">
+        <div class="l-label">Take Profit</div>
+        <div class="l-value">${fmtPrice(s.tp_price)}</div>
+      </div>
+    </div>
+
+    <div class="meta-row">
+      <span>${s.family ? s.family + ' family' : ''}${s.ticks_since_jump !== undefined && s.expected_gap_ticks ? ' · ' + s.ticks_since_jump + '/' + s.expected_gap_ticks + ' ticks' : ''}</span>
+      <span>Timeframe: ${s.timeframe || '—'}</span>
+    </div>
+    <div class="meta-row">
+      <span></span>
+      <span>${timeAgo(s.sent_at)}</span>
+    </div>
+
+    <div class="components">
+      ${compRow('Compression', s.compression)}
+      ${compRow('Velocity', s.velocity)}
+      ${compRow('Family signal (' + (s.family || '—') + ')', s.family_score ?? s.time_since_spike)}
+    </div>
+
+    <div class="disclaimer">
+      Entry, SL and TP are calculated from the live price and recent ATR at signal
+      time — a statistical estimate, not a guaranteed outcome. Synthetic index
+      spikes have a random component; use this alongside your own risk management.
+    </div>
+  `;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function compRow(name, val){
+  return `
+    <div class="comp-row">
+      <div class="top"><span class="name">${name}</span><span class="val">${val?.toFixed(1) ?? '—'}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${val ?? 0}%"></div></div>
+    </div>`;
+}
+
+function closeDetail(){
+  document.getElementById('overlay').classList.remove('show');
+}
+
+async function poll(){
+  try{
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    checkForNewSignals(data);
+    renderGrid(data);
+  }catch(e){
+    console.error('Failed to fetch signals', e);
+  }
+}
+
+function updateClock(){
+  document.getElementById('clock').textContent = new Date().toUTCString().slice(17,25) + ' UTC';
+}
+
+poll();
+setInterval(poll, POLL_MS);
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+
+</body>
+</html>
