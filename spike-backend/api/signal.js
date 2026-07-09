@@ -17,8 +17,9 @@ export default async function handler(req, res) {
 
   try {
     const {
-      symbol, direction, confidence, components, confirmations,
+      symbol, family, direction, confidence, components, confirmations,
       atr_value, entry_price, sl_price, tp_price,
+      ticks_since_jump, expected_gap_ticks, family_score,
       timeframe, status, hit_time, bar_time, sent_at
     } = req.body;
 
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
     // Build the row with only the fields that were actually sent, so a
     // status-only update (TP/SL hit) doesn't overwrite other columns with null.
     const row = { symbol };
+    if (family !== undefined) row.family = family;
     if (direction !== undefined) row.direction = direction;
     if (confidence !== undefined) row.confidence = confidence;
     if (confirmations !== undefined) row.confirmations = confirmations;
@@ -39,6 +41,9 @@ export default async function handler(req, res) {
     if (entry_price !== undefined) row.entry_price = entry_price;
     if (sl_price !== undefined) row.sl_price = sl_price;
     if (tp_price !== undefined) row.tp_price = tp_price;
+    if (ticks_since_jump !== undefined) row.ticks_since_jump = ticks_since_jump;
+    if (expected_gap_ticks !== undefined) row.expected_gap_ticks = expected_gap_ticks;
+    if (family_score !== undefined) row.family_score = family_score;
     if (timeframe !== undefined) row.timeframe = timeframe;
     if (status !== undefined) row.status = status;
     if (hit_time !== undefined) row.hit_time = hit_time;
