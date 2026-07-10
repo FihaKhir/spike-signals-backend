@@ -345,8 +345,6 @@
 const API_URL = '/api/latest';
 const POLL_MS = 4000;
 const CLOSED_VISIBLE_MS = 60 * 1000;      // keep a TP/SL-hit card visible for 1 minute after it closes
-const ENTRY_WINDOW_SECONDS = 15 * 60;     // how long a fresh signal is considered still worth entering
-const URGENT_THRESHOLD_SECONDS = 60;      // turns red inside the last minute of that window
 
 const TRACKED_SYMBOLS = [
   'GainX 400','GainX 600','GainX 800','GainX 999','GainX 1200','GainX 1800',
@@ -496,23 +494,6 @@ function formatAgo(sec){
   return Math.floor(sec/3600) + 'h ago';
 }
 
-function entryWindowInfo(s){
-  const elapsed = elapsedSecondsSince(s);
-  const remaining = ENTRY_WINDOW_SECONDS - elapsed;
-  return {
-    remaining,
-    urgent: remaining > 0 && remaining <= URGENT_THRESHOLD_SECONDS,
-    expired: remaining <= 0
-  };
-}
-
-function formatCountdown(remaining){
-  if(remaining <= 0) return t('expired');
-  const m = Math.floor(remaining/60);
-  const s = remaining % 60;
-  return `${m}m ${s.toString().padStart(2,'0')}s ${t('leftToEnter')}`;
-}
-
 // --- Rendering ----------------------------------------------------------
 function gaugeSVG(confidence, color){
   const r = 30, c = 2*Math.PI*r;
@@ -534,9 +515,7 @@ function confirmBadge(confirmations){
 
 function isVisible(s){
   const status = s.status || 'active';
-  if(status === 'active'){
-    return !entryWindowInfo(s).expired; // hide once the entry window has run out, even without a real TP/SL hit
-  }
+  if(status === 'active') return true; // no more time-based expiry — only a real TP/SL hit removes a card now
   if(!s.hit_time) return false;
   const ageMs = Date.now() - (s.hit_time * 1000);
   return ageMs < CLOSED_VISIBLE_MS;
@@ -570,15 +549,9 @@ function renderGrid(data){
     const status = s.status || 'active';
     const isClosed = status !== 'active';
     const colorHex = s.direction === 'up' ? '#35c77e' : '#e5484d';
-    const win = entryWindowInfo(s);
-    const urgent = !isClosed && win.urgent;
-
-    const footRight = isClosed
-      ? `<span class="countdown">${formatAgo(elapsedSecondsSince(s))}</span>`
-      : `<span class="countdown">${formatCountdown(win.remaining)}</span>`;
 
     return `
-    <div class="card ${isClosed ? 'closed' : ''} ${urgent ? 'urgent' : ''}" onclick="openDetail(${i})">
+    <div class="card ${isClosed ? 'closed' : ''}" onclick="openDetail(${i})">
       <div class="symbol ltr">${s.symbol}</div>
       <div class="dir ${s.direction}">${s.direction === 'up' ? '▲ ' + t('up') : '▼ ' + t('down')}</div>
       ${isClosed ? `<div class="closed-badge ${status === 'tp_hit' ? 'tp' : 'sl'}">${status === 'tp_hit' ? t('tpHit') : t('slHit')}</div>` : confirmBadge(s.confirmations)}
@@ -589,7 +562,7 @@ function renderGrid(data){
       <div class="gauge-label" style="text-align:center; margin-bottom:8px;">${t('confidence')}</div>
       <div class="foot-row">
         <span class="tf ltr">${s.timeframe || ''}${s.family ? ' · ' + s.family : ''}</span>
-        ${footRight}
+        <span class="countdown ltr">${formatAgo(elapsedSecondsSince(s))}</span>
       </div>
     </div>`;
   }).join('');
@@ -608,11 +581,8 @@ function openDetail(i){
   const isUp = s.direction === 'up';
   const status = s.status || 'active';
   const isClosed = status !== 'active';
-  const win = entryWindowInfo(s);
 
-  const countdownHtml = isClosed
-    ? ''
-    : `<div class="countdown-big ltr ${win.urgent ? 'urgent' : ''}">${formatCountdown(win.remaining)}</div>`;
+  const countdownHtml = `<div class="countdown-big ltr">${formatAgo(elapsedSecondsSince(s))}</div>`;
 
   panel.innerHTML = `
     <div class="panel-head">
