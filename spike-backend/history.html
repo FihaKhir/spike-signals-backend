@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Octopus Hunter — Performance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a1016; --panel:#121a1f; --border:#1f2f33; --text:#e4e7eb;
+    --muted:#6b7280; --up:#35c77e; --down:#e5484d; --gold:#d4a72c; --accent:#2ea8a8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; padding:24px 16px 60px; }
+  .wrap{ max-width:1000px; margin:0 auto; }
+  h1{ font-family:'IBM Plex Mono',monospace; font-size:20px; margin-bottom:24px; }
+  .panel{ background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:20px; }
+  label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:6px; }
+  input, select{
+    background:#0e1119; border:1px solid var(--border); color:var(--text);
+    font-family:'IBM Plex Mono',monospace; font-size:14px; padding:10px 12px; border-radius:6px;
+  }
+  button{
+    background:var(--accent); border:none; color:#04120f; font-family:'IBM Plex Mono',monospace;
+    font-weight:700; font-size:13px; padding:10px 16px; border-radius:6px; cursor:pointer;
+  }
+  button.secondary{ background:var(--panel); border:1px solid var(--border); color:var(--text); }
+  .stats-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:20px; }
+  .stat-box{ background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:center; }
+  .stat-box .num{ font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:700; }
+  .stat-box .lbl{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-top:4px; }
+  .stat-box.win .num{ color:var(--up); }
+  .stat-box.loss .num{ color:var(--down); }
+  .filters{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:flex-end; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th, td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); font-family:'IBM Plex Mono',monospace; white-space:nowrap; }
+  th{ color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:0.05em; }
+  .badge{ padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; }
+  .badge.win{ background:rgba(53,199,126,0.15); color:var(--up); }
+  .badge.loss{ background:rgba(229,72,77,0.15); color:var(--down); }
+  .badge.open{ background:rgba(107,114,128,0.15); color:var(--muted); }
+  .dir-up{ color:var(--up); } .dir-down{ color:var(--down); }
+  .table-scroll{ overflow-x:auto; }
+  #lockScreen{ max-width:340px; margin:80px auto; text-align:center; }
+  .error{ color:var(--down); font-size:13px; margin-top:10px; }
+  .empty-note{ color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:13px; text-align:center; padding:30px 0; }
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <h1>Performance — Admin Access</h1>
+  <label>Admin password</label>
+  <input type="password" id="adminSecretInput" style="width:100%; margin-bottom:14px;" placeholder="Enter admin password">
+  <button onclick="unlockAdmin()" style="width:100%;">Unlock</button>
+  <div class="error" id="lockError"></div>
+</div>
+
+<div class="wrap" id="panelWrap" style="display:none;">
+  <h1>📊 Octopus Hunter — Performance (Developer)</h1>
+
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--muted);">Win / loss curve (cumulative, oldest → newest)</span>
+      <button class="secondary" onclick="loadHistory()">Refresh</button>
+    </div>
+    <div id="chartWrap"></div>
+  </div>
+
+  <div class="panel">
+    <div class="filters">
+      <div>
+        <label>Family</label>
+        <select id="familyFilter" onchange="renderAll()">
+          <option value="">All</option>
+          <option value="GainX">GainX</option>
+          <option value="PainX">PainX</option>
+          <option value="SwitchX">SwitchX</option>
+          <option value="BreakX">BreakX</option>
+          <option value="TrendX">TrendX</option>
+        </select>
+      </div>
+      <div>
+        <label>Outcome</label>
+        <select id="outcomeFilter" onchange="renderAll()">
+          <option value="">All</option>
+          <option value="win">Wins</option>
+          <option value="loss">Losses</option>
+          <option value="open">Still open</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Family</th><th>Side</th><th>Confidence</th>
+            <th>Entry</th><th>SL</th><th>TP</th><th>Outcome</th>
+            <th>Opened</th><th>Closed</th>
+          </tr>
+        </thead>
+        <tbody id="historyTableBody"></tbody>
+      </table>
+      <div class="empty-note" id="emptyNote" style="display:none;">No trade history yet — it fills in as signals fire and resolve.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ADMIN_KEY = 'octopusHunterAdminSecret';
+let adminSecret = localStorage.getItem(ADMIN_KEY);
+let allRows = [];
+
+function unlockAdmin(){
+  const val = document.getElementById('adminSecretInput').value.trim();
+  if(!val) return;
+  adminSecret = val;
+  localStorage.setItem(ADMIN_KEY, val);
+  tryShowPanel();
+}
+
+async function tryShowPanel(){
+  const ok = await loadHistory();
+  if(ok){
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('panelWrap').style.display = 'block';
+  } else {
+    document.getElementById('lockError').textContent = 'Wrong password.';
+    localStorage.removeItem(ADMIN_KEY);
+    adminSecret = null;
+  }
+}
+
+function fmtPrice(v){
+  if(v === null || v === undefined) return '—';
+  return Number(v).toFixed(v >= 100 ? 2 : 5);
+}
+
+function fmtTime(unixSeconds){
+  if(!unixSeconds) return '—';
+  return new Date(unixSeconds * 1000).toLocaleString();
+}
+
+async function loadHistory(){
+  try{
+    const res = await fetch('/api/history?admin_secret=' + encodeURIComponent(adminSecret));
+    if(!res.ok) return false;
+    allRows = await res.json();
+    renderAll();
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+function filteredRows(){
+  const fam = document.getElementById('familyFilter')?.value;
+  const outcome = document.getElementById('outcomeFilter')?.value;
+  return allRows.filter(r => (!fam || r.family === fam) && (!outcome || r.outcome === outcome));
+}
+
+function renderAll(){
+  const rows = filteredRows();
+  renderStats(rows);
+  renderChart(rows);
+  renderTable(rows);
+}
+
+function renderStats(rows){
+  const wins = rows.filter(r => r.outcome === 'win').length;
+  const losses = rows.filter(r => r.outcome === 'loss').length;
+  const open = rows.filter(r => r.outcome === 'open').length;
+  const resolved = wins + losses;
+  const winRate = resolved > 0 ? ((wins / resolved) * 100).toFixed(1) : '—';
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-box"><div class="num">${rows.length}</div><div class="lbl">Total signals</div></div>
+    <div class="stat-box win"><div class="num">${wins}</div><div class="lbl">Wins</div></div>
+    <div class="stat-box loss"><div class="num">${losses}</div><div class="lbl">Losses</div></div>
+    <div class="stat-box"><div class="num">${open}</div><div class="lbl">Still open</div></div>
+    <div class="stat-box"><div class="num">${winRate}${winRate !== '—' ? '%' : ''}</div><div class="lbl">Win rate</div></div>
+  `;
+}
+
+function renderChart(rows){
+  const resolved = [...rows]
+    .filter(r => r.outcome === 'win' || r.outcome === 'loss')
+    .sort((a, b) => (a.closed_at || 0) - (b.closed_at || 0));
+
+  const wrap = document.getElementById('chartWrap');
+  if(resolved.length === 0){
+    wrap.innerHTML = '<div class="empty-note">No resolved trades yet.</div>';
+    return;
+  }
+
+  let cum = 0;
+  const points = [0];
+  resolved.forEach(r => { cum += (r.outcome === 'win' ? 1 : -1); points.push(cum); });
+
+  const W = 900, H = 240, padX = 30, padY = 20;
+  const minV = Math.min(0, ...points);
+  const maxV = Math.max(0, ...points);
+  const range = (maxV - minV) || 1;
+
+  const xStep = (W - padX * 2) / (points.length - 1 || 1);
+  const yFor = v => H - padY - ((v - minV) / range) * (H - padY * 2);
+  const xFor = i => padX + i * xStep;
+
+  const zeroY = yFor(0);
+
+  let path = `M ${xFor(0)} ${yFor(points[0])}`;
+  let segments = '';
+  for(let i = 1; i < points.length; i++){
+    const isWin = points[i] > points[i-1];
+    const color = isWin ? 'var(--up)' : 'var(--down)';
+    segments += `<line x1="${xFor(i-1)}" y1="${yFor(points[i-1])}" x2="${xFor(i)}" y2="${yFor(points[i])}" stroke="${color}" stroke-width="2"/>`;
+  }
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto;">
+      <line x1="${padX}" y1="${zeroY}" x2="${W - padX}" y2="${zeroY}" stroke="#2a3340" stroke-width="1" stroke-dasharray="4,4"/>
+      ${segments}
+    </svg>
+  `;
+}
+
+function renderTable(rows){
+  const tbody = document.getElementById('historyTableBody');
+  const emptyNote = document.getElementById('emptyNote');
+
+  if(rows.length === 0){
+    tbody.innerHTML = '';
+    emptyNote.style.display = 'block';
+    return;
+  }
+  emptyNote.style.display = 'none';
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.symbol || '—'}</td>
+      <td>${r.family || '—'}</td>
+      <td class="${r.direction === 'up' ? 'dir-up' : 'dir-down'}">${r.direction === 'up' ? '▲ BUY' : '▼ SELL'}</td>
+      <td>${r.confidence ? r.confidence.toFixed(1) + '%' : '—'}</td>
+      <td>${fmtPrice(r.entry_price)}</td>
+      <td>${fmtPrice(r.sl_price)}</td>
+      <td>${fmtPrice(r.tp_price)}</td>
+      <td><span class="badge ${r.outcome}">${r.outcome.toUpperCase()}</span></td>
+      <td>${fmtTime(r.opened_at)}</td>
+      <td>${fmtTime(r.closed_at)}</td>
+    </tr>
+  `).join('');
+}
+
+if(adminSecret){
+  tryShowPanel();
+}
+</script>
+
+</body>
+</html>
